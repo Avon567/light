@@ -22,6 +22,11 @@ const paymentActionBtn = document.getElementById("paymentActionBtn");
 const paymentFields = document.getElementById("paymentFields");
 const paymentMethods = document.querySelectorAll(".payment-method");
 const paymentModeLabel = document.getElementById("paymentModeLabel");
+const modePills = document.querySelectorAll(".mode-pill");
+const modeLabel = document.getElementById("modeLabel");
+const toast = document.getElementById("toast");
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+const beamSweep = document.getElementById("beamSweep");
 
 let isOn = false;
 let isLocked = false;
@@ -30,14 +35,29 @@ let countdown = 10;
 let timer = null;
 let audioCtx = null;
 let selectedPayment = "upi";
+let currentMode = "beam";
+let sosTimer = null;
+let isLightTheme = false;
 
 function initAudio() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === "suspended") audioCtx.resume();
+  if (typeof window === "undefined") return;
+  if (!audioCtx) {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch {
+      audioCtx = null;
+    }
+  }
+
+  if (audioCtx && audioCtx.state === "suspended") {
+    audioCtx.resume().catch(() => {});
+  }
 }
 
 function playTone(type) {
   initAudio();
+  if (!audioCtx) return;
+
   const now = audioCtx.currentTime;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
@@ -48,6 +68,8 @@ function playTone(type) {
     success: { freq: [880, 1320], dur: 0.18, type: "sine", amp: 0.08 },
   };
   const tone = tones[type];
+  if (!tone) return;
+
   osc.type = tone.type;
   osc.frequency.setValueAtTime(tone.freq[0], now);
   osc.frequency.exponentialRampToValueAtTime(tone.freq[1], now + tone.dur);
@@ -64,36 +86,104 @@ function getBrightnessValue() {
   return Math.max(0.3, Math.min(1, Number(brightnessSlider.value) / 100));
 }
 
+function showToast(message) {
+  toast.textContent = message;
+  toast.classList.remove("hidden");
+  clearTimeout(showToast.timeout);
+  showToast.timeout = setTimeout(() => toast.classList.add("hidden"), 1800);
+}
+
+function triggerHaptic(pattern = 8) {
+  if (typeof navigator !== "undefined" && navigator.vibrate) {
+    navigator.vibrate(pattern);
+  }
+}
+
+function setPressedState(el, pressed) {
+  if (!el) return;
+  el.classList.toggle("pressed", pressed);
+}
+
+function attachFeedback(el) {
+  if (!el) return;
+  el.addEventListener("pointerdown", () => {
+    setPressedState(el, true);
+    triggerHaptic(8);
+  });
+  const clear = () => setPressedState(el, false);
+  el.addEventListener("pointerup", clear);
+  el.addEventListener("pointerleave", clear);
+  el.addEventListener("pointercancel", clear);
+}
+
+function applyTheme() {
+  document.body.classList.toggle("light-theme", isLightTheme);
+  appShell.classList.toggle("light-theme", isLightTheme);
+  themeToggleBtn.textContent = isLightTheme ? "☀️" : "🌙";
+  themeToggleBtn.title = isLightTheme ? "Switch to dark theme" : "Switch to light theme";
+}
+
 function updateVisuals() {
   const sliderValue = Number(brightnessSlider.value);
   const brightness = getBrightnessValue();
+  const isActive = isOn && !isLocked;
 
   brightnessLabel.textContent = `${sliderValue}%`;
   appShell.style.setProperty("--beamBrightness", brightness);
-  appShell.style.setProperty("--torchOpacity", isOn ? brightness : 0);
-  appShell.style.setProperty("--glowOpacity", isOn ? Math.max(0.14, brightness * 0.6) : 0);
-  appShell.style.setProperty("--haloOpacity", isOn ? Math.max(0.1, brightness * 0.4) : 0);
+  appShell.style.setProperty("--torchOpacity", isActive ? brightness : 0);
+  appShell.style.setProperty("--glowOpacity", isActive ? Math.max(0.14, brightness * 0.6) : 0);
+  appShell.style.setProperty("--haloOpacity", isActive ? Math.max(0.1, brightness * 0.4) : 0);
 
-  beamLayer.style.opacity = isOn ? String(brightness) : "0";
-  beamLayer.style.filter = isOn
+  beamLayer.style.opacity = isActive ? String(brightness) : "0";
+  beamLayer.style.filter = isActive
     ? `brightness(${1 + brightness}) saturate(${0.95 + brightness * 0.35})`
     : "brightness(0)";
+  beamSweep.style.opacity = isActive ? String(Math.max(0.2, brightness * 0.55)) : "0";
+  beamSweep.style.setProperty("--beamSweepBrightness", String(1 + brightness * 0.2));
+  beamSweep.style.setProperty("--beamSweepOpacity", String(Math.max(0.2, brightness * 0.55)));
 
-  appShell.classList.toggle("on", isOn);
+  appShell.classList.toggle("on", isActive);
+  appShell.classList.toggle("locked", isLocked);
+  appShell.classList.toggle("pulse-mode", isActive && currentMode === "pulse");
+  appShell.classList.toggle("sos-mode", isActive && currentMode === "sos");
 
-  statusPill.textContent = isOn ? "Torch On" : "Torch Off";
-  hintText.textContent = isOn ? "Tap the torch to turn it off" : "Tap the torch to turn it on";
+  statusPill.textContent = isActive ? (currentMode === "sos" ? "SOS Mode" : currentMode === "pulse" ? "Pulse Mode" : "Torch On") : "Torch Off";
+  hintText.textContent = isActive ? "Tap again to adjust or turn off" : "Tap the torch to turn it on";
   lockBtn.setAttribute("aria-label", isLocked ? "Unlock torch controls" : "Lock torch controls");
   lockBtn.title = isLocked ? "Unlock" : "Lock";
+  lockBtn.textContent = isLocked ? "🔓" : "🔒";
   flashBtn.style.pointerEvents = isLocked ? "none" : "auto";
   flashBtn.style.opacity = isLocked ? "0.7" : "1";
 }
 
+function stopSos() {
+  if (sosTimer) {
+    clearInterval(sosTimer);
+    sosTimer = null;
+  }
+}
+
+function startSos() {
+  stopSos();
+  let blink = true;
+  sosTimer = setInterval(() => {
+    setTorch(blink);
+    blink = !blink;
+  }, 360);
+}
+
 function setTorch(state) {
   isOn = state;
-  if (isOn) playTone("on");
+  if (!state) {
+    stopSos();
+    resetCountdown();
+  }
+  if (isOn) {
+    playTone("on");
+  } else {
+    playTone("off");
+  }
   updateVisuals();
-  if (!isOn) playTone("off");
 }
 
 function openModal(modal) {
@@ -111,6 +201,13 @@ function closeModal(modal) {
   }
 }
 
+function updateWaitButton(label, smallText) {
+  const labelEl = waitBtn.querySelector("span");
+  const smallEl = waitBtn.querySelector("small");
+  if (labelEl) labelEl.textContent = label;
+  if (smallEl) smallEl.textContent = smallText;
+}
+
 function resetCountdown() {
   clearInterval(timer);
   timer = null;
@@ -118,7 +215,22 @@ function resetCountdown() {
   isCounting = false;
   countdownWrap.classList.add("hidden");
   waitBtn.disabled = false;
-  waitBtn.querySelector("span").textContent = "Wait 10 Seconds";
+  updateWaitButton("Wait 10 Seconds", "Start a timed shutdown");
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  modeLabel.textContent = mode === "pulse" ? "Pulse" : mode === "sos" ? "SOS" : "Beam";
+  modePills.forEach((pill) => pill.classList.toggle("active", pill.dataset.mode === mode));
+
+  if (isOn && mode === "sos") {
+    startSos();
+  } else {
+    stopSos();
+  }
+
+  updateVisuals();
+  showToast(mode === "pulse" ? "Pulse mode enabled" : mode === "sos" ? "SOS mode enabled" : "Beam mode enabled");
 }
 
 function startCountdown() {
@@ -127,6 +239,7 @@ function startCountdown() {
   countdown = 10;
   countdownWrap.classList.remove("hidden");
   waitBtn.disabled = true;
+  updateWaitButton("Auto-off active", "Shutting down soon");
   countdownValue.textContent = countdown;
 
   timer = setInterval(() => {
@@ -152,7 +265,8 @@ function openPaymentSheet() {
 }
 
 function setPaymentMethod(method) {
-  selectedPayment = method;
+  const safeMethod = detailsMap[method] ? method : "upi";
+  selectedPayment = safeMethod;
   paymentModeLabel.textContent = {
     upi: "UPI checkout selected",
     card: "Card checkout selected",
@@ -160,9 +274,9 @@ function setPaymentMethod(method) {
     qr: "QR checkout selected",
     netbanking: "Net banking selected",
     redeem: "Redeem code selected",
-  }[method];
+  }[safeMethod];
 
-  paymentMethods.forEach((btn) => btn.classList.toggle("active", btn.dataset.method === method));
+  paymentMethods.forEach((btn) => btn.classList.toggle("active", btn.dataset.method === safeMethod));
 
   const details = {
     card: {
@@ -203,7 +317,7 @@ function setPaymentMethod(method) {
     },
   };
 
-  const item = details[method];
+  const item = details[safeMethod];
   paymentPanel.classList.remove("hidden");
   paymentPanelTitle.textContent = item.title;
   paymentPanelBody.textContent = item.body;
@@ -212,11 +326,22 @@ function setPaymentMethod(method) {
   paymentActionBtn.querySelector("small").textContent = "Complete checkout";
 }
 
+const detailsMap = {
+  upi: true,
+  card: true,
+  wallet: true,
+  qr: true,
+  netbanking: true,
+  redeem: true,
+};
+
 flashBtn.addEventListener("click", () => {
   if (isLocked) return;
   playTone("tap");
+  triggerHaptic(12);
   if (!isOn) {
     setTorch(true);
+    if (currentMode === "sos") startSos();
     return;
   }
   openModal(offModal);
@@ -225,7 +350,6 @@ flashBtn.addEventListener("click", () => {
 lockBtn.addEventListener("click", () => {
   playTone("tap");
   isLocked = !isLocked;
-  appShell.classList.toggle("locked", isLocked);
   updateVisuals();
 });
 
@@ -259,13 +383,30 @@ waitBtn.addEventListener("click", () => {
 paymentMethods.forEach((btn) => {
   btn.addEventListener("click", () => {
     playTone("tap");
+    triggerHaptic(10);
     setPaymentMethod(btn.dataset.method);
   });
 });
 
+modePills.forEach((pill) => {
+  pill.addEventListener("click", () => {
+    playTone("tap");
+    triggerHaptic(10);
+    setMode(pill.dataset.mode);
+  });
+});
+
+themeToggleBtn.addEventListener("click", () => {
+  playTone("tap");
+  triggerHaptic(10);
+  isLightTheme = !isLightTheme;
+  applyTheme();
+  showToast(isLightTheme ? "Light theme enabled" : "Dark theme enabled");
+});
+
 paymentActionBtn.addEventListener("click", () => {
   playTone("success");
-  alert(`${paymentPanelTitle.textContent} completed successfully.`);
+  window.alert(`${paymentPanelTitle.textContent} completed successfully.`);
 });
 
 paymentOkBtn.addEventListener("click", () => {
@@ -290,7 +431,12 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+document.querySelectorAll("button, .payment-method, .mode-pill").forEach(attachFeedback);
+attachFeedback(flashBtn);
+
 brightnessSlider.value = "100";
 setPaymentMethod("upi");
+setMode("beam");
+applyTheme();
 updateVisuals();
 resetCountdown();
