@@ -1,296 +1,194 @@
-const appShell = document.getElementById("appShell");
-const flashBtn = document.getElementById("flashBtn");
-const lockBtn = document.getElementById("lockBtn");
-const statusPill = document.getElementById("statusPill");
-const hintText = document.getElementById("hintText");
-const beamLayer = document.getElementById("beamLayer");
-const brightnessSlider = document.getElementById("brightnessSlider");
-const brightnessLabel = document.getElementById("brightnessLabel");
-const sheetBackdrop = document.getElementById("sheetBackdrop");
-const offModal = document.getElementById("offModal");
-const paymentModal = document.getElementById("paymentModal");
-const upgradeBtn = document.getElementById("upgradeBtn");
-const cancelBtn = document.getElementById("cancelBtn");
-const waitBtn = document.getElementById("waitBtn");
-const countdownWrap = document.getElementById("countdownWrap");
-const countdownValue = document.getElementById("countdownValue");
-const paymentOkBtn = document.getElementById("paymentOkBtn");
-const paymentPanel = document.getElementById("paymentPanel");
-const paymentPanelTitle = document.getElementById("paymentPanelTitle");
-const paymentPanelBody = document.getElementById("paymentPanelBody");
-const paymentActionBtn = document.getElementById("paymentActionBtn");
-const paymentFields = document.getElementById("paymentFields");
-const paymentMethods = document.querySelectorAll(".payment-method");
-const paymentModeLabel = document.getElementById("paymentModeLabel");
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neon Torch</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="appShell">
+      <div class="background-glow" aria-hidden="true"></div>
+      <div class="vignette" aria-hidden="true"></div>
+      <div class="beam-layer" id="beamLayer" aria-hidden="true"></div>
+      <div class="beam-sweep" id="beamSweep" aria-hidden="true"></div>
 
-let isOn = false;
-let isLocked = false;
-let isCounting = false;
-let countdown = 10;
-let timer = null;
-let audioCtx = null;
-let selectedPayment = "upi";
+      <div class="screen">
+        <div class="top-row">
+          <div class="status-pill" id="statusPill">Torch Off</div>
+          <div class="top-actions">
+            <button class="icon-btn" id="themeToggleBtn" type="button" aria-label="Toggle theme" title="Toggle theme">🌙</button>
+            <button class="icon-btn" id="lockBtn" type="button" aria-label="Lock torch controls" title="Lock">🔒</button>
+          </div>
+        </div>
 
-function initAudio() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === "suspended") audioCtx.resume();
-}
+        <div class="hero">
+          <div class="title-wrap">
+            <div class="subtitle">Neon Flashlight</div>
+            <h1>Light Up</h1>
+          </div>
 
-function playTone(type) {
-  initAudio();
-  const now = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  const tones = {
-    tap: { freq: [520, 760], dur: 0.06, type: "triangle", amp: 0.03 },
-    on: { freq: [680, 980], dur: 0.14, type: "sine", amp: 0.07 },
-    off: { freq: [520, 340], dur: 0.16, type: "sine", amp: 0.06 },
-    success: { freq: [880, 1320], dur: 0.18, type: "sine", amp: 0.08 },
-  };
-  const tone = tones[type];
-  osc.type = tone.type;
-  osc.frequency.setValueAtTime(tone.freq[0], now);
-  osc.frequency.exponentialRampToValueAtTime(tone.freq[1], now + tone.dur);
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(tone.amp, now + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + tone.dur);
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start(now);
-  osc.stop(now + tone.dur + 0.02);
-}
+          <div class="torch-scene">
+            <div class="torch-halo" aria-hidden="true"></div>
+            <div class="torch-beam" aria-hidden="true"></div>
+            <button class="torch-body" id="flashBtn" type="button" aria-label="Toggle flashlight">
+              <span class="torch-head">
+                <span class="torch-lens">
+                  <span class="torch-lens-core"></span>
+                </span>
+                <span class="torch-lens-ring"></span>
+              </span>
+              <span class="torch-grip">
+                <span class="torch-switch"></span>
+                <span class="torch-tailcap"></span>
+                <span class="torch-battery"></span>
+                <span class="torch-texture"></span>
+              </span>
+            </button>
+          </div>
 
-function getBrightnessValue() {
-  return Math.max(0.3, Math.min(1, Number(brightnessSlider.value) / 100));
-}
+          <p class="hint" id="hintText">Tap the torch to turn it on</p>
+        </div>
 
-function updateVisuals() {
-  const sliderValue = Number(brightnessSlider.value);
-  const brightness = getBrightnessValue();
+        <div class="controls">
+          <div class="control-card mode-card">
+            <div class="control-head">
+              <span>Light modes</span>
+              <span id="modeLabel">Beam</span>
+            </div>
+            <div class="mode-row">
+              <button class="mode-pill active" data-mode="beam" type="button">Beam</button>
+              <button class="mode-pill" data-mode="pulse" type="button">Pulse</button>
+              <button class="mode-pill" data-mode="sos" type="button">SOS</button>
+            </div>
+          </div>
 
-  brightnessLabel.textContent = `${sliderValue}%`;
-  appShell.style.setProperty("--beamBrightness", brightness);
-  appShell.style.setProperty("--torchOpacity", isOn ? brightness : 0);
-  appShell.style.setProperty("--glowOpacity", isOn ? Math.max(0.14, brightness * 0.6) : 0);
-  appShell.style.setProperty("--haloOpacity", isOn ? Math.max(0.1, brightness * 0.4) : 0);
+          <div class="control-card">
+            <div class="control-head">
+              <span>Brightness</span>
+              <span id="brightnessLabel">100%</span>
+            </div>
+            <input id="brightnessSlider" type="range" min="30" max="100" value="100" />
+          </div>
 
-  beamLayer.style.opacity = isOn ? String(brightness) : "0";
-  beamLayer.style.filter = isOn
-    ? `brightness(${1 + brightness}) saturate(${0.95 + brightness * 0.35})`
-    : "brightness(0)";
+          <div class="control-card">
+            <div class="control-head">
+              <span>Auto-off</span>
+              <span>10s</span>
+            </div>
+            <button class="ios-action primary" id="waitBtn" type="button">
+              <span>Wait 10 Seconds</span>
+              <small>Start a timed shutdown</small>
+            </button>
+            <div class="countdown-wrap hidden" id="countdownWrap">
+              <div class="countdown-label">Turning off in</div>
+              <div class="countdown-value" id="countdownValue">10</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-  appShell.classList.toggle("on", isOn);
+      <div class="toast hidden" id="toast"></div>
+      <div class="sheet-backdrop hidden" id="sheetBackdrop"></div>
 
-  statusPill.textContent = isOn ? "Torch On" : "Torch Off";
-  hintText.textContent = isOn ? "Tap the torch to turn it off" : "Tap the torch to turn it on";
-  lockBtn.setAttribute("aria-label", isLocked ? "Unlock torch controls" : "Lock torch controls");
-  lockBtn.title = isLocked ? "Unlock" : "Lock";
-  flashBtn.style.pointerEvents = isLocked ? "none" : "auto";
-  flashBtn.style.opacity = isLocked ? "0.7" : "1";
-}
+      <div class="modal modal-hidden" id="offModal" aria-hidden="true">
+        <div class="modal-card">
+          <div class="modal-handle"></div>
+          <div class="sheet-header">
+            <div class="sheet-icon">⚡</div>
+            <div>
+              <h2>Turn off torch?</h2>
+              <p>Upgrade to keep the light on longer.</p>
+            </div>
+          </div>
 
-function setTorch(state) {
-  isOn = state;
-  if (isOn) playTone("on");
-  updateVisuals();
-  if (!isOn) playTone("off");
-}
+          <div class="payment-summary">
+            <div>
+              <div class="summary-title">Power boost</div>
+              <div class="summary-subtitle">Lite mode will shut down after 10 seconds.</div>
+            </div>
+            <div class="summary-price">$0</div>
+          </div>
 
-function openModal(modal) {
-  sheetBackdrop.classList.remove("hidden");
-  modal.classList.remove("modal-hidden");
-  modal.setAttribute("aria-hidden", "false");
-  modal.style.animation = "sheetIn 0.28s ease";
-}
+          <div class="payment-actions">
+            <button class="ios-action primary" id="upgradeBtn" type="button">
+              <span>Upgrade</span>
+              <small>Unlock premium light controls</small>
+            </button>
+            <button class="ios-action secondary" id="cancelBtn" type="button">
+              <span>Keep it simple</span>
+              <small>Close this prompt</small>
+            </button>
+          </div>
+        </div>
+      </div>
 
-function closeModal(modal) {
-  modal.classList.add("modal-hidden");
-  modal.setAttribute("aria-hidden", "true");
-  if (document.querySelectorAll(".modal:not(.modal-hidden)").length === 0) {
-    sheetBackdrop.classList.add("hidden");
-  }
-}
+      <div class="modal modal-hidden" id="paymentModal" aria-hidden="true">
+        <div class="modal-card payment-sheet">
+          <div class="modal-handle"></div>
+          <div class="payment-hero">
+            <div class="payment-badge">💳</div>
+            <div>
+              <h2>Checkout</h2>
+              <p id="paymentModeLabel">UPI checkout selected</p>
+            </div>
+          </div>
 
-function resetCountdown() {
-  clearInterval(timer);
-  timer = null;
-  countdown = 10;
-  isCounting = false;
-  countdownWrap.classList.add("hidden");
-  waitBtn.disabled = false;
-  waitBtn.querySelector("span").textContent = "Wait 10 Seconds";
-}
+          <div class="payment-summary">
+            <div>
+              <div class="summary-title">Premium upgrade</div>
+              <div class="summary-subtitle">Choose your payment method.</div>
+            </div>
+            <div class="summary-price">$4.99</div>
+          </div>
 
-function startCountdown() {
-  if (isCounting) return;
-  isCounting = true;
-  countdown = 10;
-  countdownWrap.classList.remove("hidden");
-  waitBtn.disabled = true;
-  countdownValue.textContent = countdown;
+          <div class="payment-methods" role="tablist" aria-label="Payment methods">
+            <button class="payment-method active" data-method="upi" type="button">
+              <strong>UPI</strong>
+              <span>Instant pay</span>
+            </button>
+            <button class="payment-method" data-method="card" type="button">
+              <strong>Card</strong>
+              <span>Debit / credit</span>
+            </button>
+            <button class="payment-method" data-method="wallet" type="button">
+              <strong>Wallet</strong>
+              <span>Saved balance</span>
+            </button>
+            <button class="payment-method" data-method="qr" type="button">
+              <strong>QR</strong>
+              <span>Scan to pay</span>
+            </button>
+            <button class="payment-method" data-method="netbanking" type="button">
+              <strong>Net Banking</strong>
+              <span>Bank transfer</span>
+            </button>
+            <button class="payment-method" data-method="redeem" type="button">
+              <strong>Redeem</strong>
+              <span>Coupon code</span>
+            </button>
+          </div>
 
-  timer = setInterval(() => {
-    countdown -= 1;
-    countdownValue.textContent = countdown;
-    countdownValue.style.animation = "none";
-    void countdownValue.offsetWidth;
-    countdownValue.style.animation = "pop 0.4s ease";
-    if (countdown <= 0) {
-      clearInterval(timer);
-      timer = null;
-      playTone("off");
-      closeModal(offModal);
-      resetCountdown();
-      setTorch(false);
-    }
-  }, 1000);
-}
+          <div class="payment-detail-card" id="paymentPanel">
+            <div class="payment-panel-title" id="paymentPanelTitle">Pay with UPI</div>
+            <div class="payment-panel-body" id="paymentPanelBody">Enter UPI ID and complete payment instantly.</div>
+            <div class="payment-fields" id="paymentFields"></div>
+          </div>
 
-function openPaymentSheet() {
-  openModal(paymentModal);
-  setPaymentMethod(selectedPayment);
-}
+          <div class="payment-actions">
+            <button class="ios-action primary" id="paymentActionBtn" type="button">
+              <span>Pay Now</span>
+              <small>Complete checkout</small>
+            </button>
+            <button class="ios-action tertiary" id="paymentOkBtn" type="button">
+              <span>Close</span>
+              <small>Return to the torch</small>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
-function setPaymentMethod(method) {
-  selectedPayment = method;
-  paymentModeLabel.textContent = {
-    upi: "UPI checkout selected",
-    card: "Card checkout selected",
-    wallet: "Wallet checkout selected",
-    qr: "QR checkout selected",
-    netbanking: "Net banking selected",
-    redeem: "Redeem code selected",
-  }[method];
-
-  paymentMethods.forEach((btn) => btn.classList.toggle("active", btn.dataset.method === method));
-
-  const details = {
-    card: {
-      title: "Add Card",
-      body: "Enter card details to continue with secure checkout.",
-      fields: '<input id="paymentInput1" placeholder="Card Number" /><input id="paymentInput2" placeholder="MM / YY / CVV" />',
-      action: "Add Card",
-    },
-    upi: {
-      title: "Pay with UPI",
-      body: "Enter UPI ID and complete payment instantly.",
-      fields: '<input id="paymentInput1" placeholder="UPI ID" /><input id="paymentInput2" placeholder="Mobile Number (optional)" />',
-      action: "Pay Now",
-    },
-    wallet: {
-      title: "Wallet",
-      body: "Choose a wallet and continue with balance payment.",
-      fields: '<input id="paymentInput1" placeholder="Wallet Name" /><input id="paymentInput2" placeholder="Mobile Number" />',
-      action: "Continue",
-    },
-    qr: {
-      title: "Pay with QR",
-      body: "Scan the QR and complete the payment.",
-      fields: '<div class="qr-box">▣</div><input id="paymentInput1" placeholder="Reference Note (optional)" />',
-      action: "Scan & Pay",
-    },
-    netbanking: {
-      title: "Net Banking",
-      body: "Select bank and user ID to proceed.",
-      fields: '<input id="paymentInput1" placeholder="Bank Name" /><input id="paymentInput2" placeholder="User ID" />',
-      action: "Continue",
-    },
-    redeem: {
-      title: "Redeem Code",
-      body: "Enter your coupon or voucher code.",
-      fields: '<input id="paymentInput1" placeholder="Promo Code" /><input id="paymentInput2" placeholder="Mobile Number" />',
-      action: "Redeem",
-    },
-  };
-
-  const item = details[method];
-  paymentPanel.classList.remove("hidden");
-  paymentPanelTitle.textContent = item.title;
-  paymentPanelBody.textContent = item.body;
-  paymentFields.innerHTML = item.fields;
-  paymentActionBtn.querySelector("span").textContent = item.action;
-  paymentActionBtn.querySelector("small").textContent = "Complete checkout";
-}
-
-flashBtn.addEventListener("click", () => {
-  if (isLocked) return;
-  playTone("tap");
-  if (!isOn) {
-    setTorch(true);
-    return;
-  }
-  openModal(offModal);
-});
-
-lockBtn.addEventListener("click", () => {
-  playTone("tap");
-  isLocked = !isLocked;
-  appShell.classList.toggle("locked", isLocked);
-  updateVisuals();
-});
-
-brightnessSlider.addEventListener("input", () => {
-  if (isLocked) return;
-  updateVisuals();
-});
-
-brightnessSlider.addEventListener("change", () => {
-  playTone("tap");
-  updateVisuals();
-});
-
-upgradeBtn.addEventListener("click", () => {
-  playTone("tap");
-  closeModal(offModal);
-  openPaymentSheet();
-});
-
-cancelBtn.addEventListener("click", () => {
-  playTone("tap");
-  closeModal(offModal);
-  resetCountdown();
-});
-
-waitBtn.addEventListener("click", () => {
-  playTone("tap");
-  startCountdown();
-});
-
-paymentMethods.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    playTone("tap");
-    setPaymentMethod(btn.dataset.method);
-  });
-});
-
-paymentActionBtn.addEventListener("click", () => {
-  playTone("success");
-  alert(`${paymentPanelTitle.textContent} completed successfully.`);
-});
-
-paymentOkBtn.addEventListener("click", () => {
-  playTone("tap");
-  closeModal(paymentModal);
-});
-
-sheetBackdrop.addEventListener("click", () => {
-  if (!paymentModal.classList.contains("modal-hidden")) closeModal(paymentModal);
-  if (!offModal.classList.contains("modal-hidden")) closeModal(offModal);
-});
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    closeModal(paymentModal);
-    closeModal(offModal);
-    resetCountdown();
-  }
-  if ((e.key === " " || e.key === "Enter") && document.activeElement === document.body && !isLocked) {
-    e.preventDefault();
-    flashBtn.click();
-  }
-});
-
-brightnessSlider.value = "100";
-setPaymentMethod("upi");
-updateVisuals();
-resetCountdown();
+    <script src="script.js"></script>
+  </body>
+</html>
