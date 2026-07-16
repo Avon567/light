@@ -7,6 +7,18 @@
   --glowOpacity: 0.5;
   --haloOpacity: 0.35;
   --beamSoftness: 0.9px;
+  --surface: rgba(255,255,255,0.08);
+  --surface-strong: rgba(255,255,255,0.12);
+  --card-bg: rgba(18, 22, 34, 0.88);
+}
+
+body.light-theme {
+  --text: #07131f;
+  --muted: rgba(7, 19, 31, 0.68);
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.18);
+  --surface: rgba(255,255,255,0.72);
+  --surface-strong: rgba(255,255,255,0.92);
+  --card-bg: rgba(248, 251, 255, 0.9);
 }
 
 * { box-sizing: border-box; }
@@ -26,6 +38,7 @@ html, body {
 body {
   display: grid;
   place-items: center;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 .app-shell {
@@ -38,11 +51,19 @@ body {
     radial-gradient(circle at 50% 18%, rgba(255,255,255,0.08), transparent 18%),
     linear-gradient(180deg, rgba(18, 22, 34, 0.96), rgba(6, 8, 15, 1));
   box-shadow: var(--shadow);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+body.light-theme .app-shell {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(122,214,255,0.12), transparent 18%),
+    linear-gradient(180deg, rgba(242, 249, 255, 0.98), rgba(221, 234, 247, 0.98));
 }
 
 .background-glow,
 .vignette,
-.beam-layer {
+.beam-layer,
+.beam-sweep {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -72,6 +93,17 @@ body {
   filter: blur(var(--beamSoftness)) brightness(var(--beamBrightness)) saturate(1.1);
 }
 
+.beam-sweep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.24) 40%, transparent 70%);
+  mix-blend-mode: screen;
+  transform: translateX(-120%) skewX(-20deg);
+  animation: beamSweepMove 2.6s ease-in-out infinite;
+}
+
 .app-shell.on .beam-layer {
   opacity: var(--torchOpacity);
   animation: beamPulse 1.6s ease-in-out infinite, beamShine 2.8s ease-in-out infinite;
@@ -94,6 +126,12 @@ body {
   justify-content: space-between;
 }
 
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .status-pill {
   padding: 10px 14px;
   border-radius: 999px;
@@ -114,6 +152,7 @@ body {
   transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255,255,255,0.06);
+  font-size: 1rem;
 }
 
 .icon-btn:hover {
@@ -143,10 +182,23 @@ body {
   margin-bottom: 6px;
 }
 
+.title-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .title-wrap h1 {
   margin: 0;
   font-size: clamp(2.7rem, 8vw, 4.5rem);
   letter-spacing: -0.07em;
+}
+
+.hint {
+  font-size: 0.95rem;
+  color: var(--muted);
+  margin: 0;
+  max-width: 280px;
 }
 
 .torch-scene {
@@ -169,8 +221,9 @@ body {
   width: 260px;
   height: 260px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,255,255,0.15), transparent 65%);
+  background: radial-gradient(circle, rgba(255,255,255,0.22), rgba(255,255,255,0.08) 38%, transparent 68%);
   opacity: var(--haloOpacity);
+  filter: blur(10px);
 }
 
 .torch-beam {
@@ -202,33 +255,82 @@ body {
   padding: 0;
   background: transparent;
   cursor: pointer;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition: transform 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  touch-action: manipulation;
 }
 
-.torch-body:active { transform: scale(0.98); }
+.torch-body:active { transform: scale(0.97); }
+
+.torch-body.pressed {
+  filter: brightness(1.1);
+}
 
 .torch-head {
   position: absolute;
   left: 50%;
   top: 0;
   transform: translateX(-50%);
-  width: 172px;
-  height: 120px;
-  border-radius: 42px 42px 30px 30px;
-  background: linear-gradient(180deg, #eef3fa 0%, #c8d2de 24%, #7f8b99 66%, #576270 100%);
-  box-shadow: inset 0 8px 16px rgba(255,255,255,0.26), inset 0 -10px 18px rgba(0,0,0,0.22), 0 22px 32px rgba(0,0,0,0.28);
+  width: 176px;
+  height: 122px;
+  border-radius: 46px 46px 34px 34px;
+  background: linear-gradient(180deg, #f5f8fc 0%, #d4dde8 24%, #7b8795 68%, #4f5966 100%);
+  box-shadow: inset 0 8px 16px rgba(255,255,255,0.3), inset 0 -12px 20px rgba(0,0,0,0.24), 0 24px 34px rgba(0,0,0,0.3);
+}
+
+.torch-lens-ring {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  width: 122px;
+  height: 20px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.3), rgba(0,0,0,0.16));
+  opacity: 0.8;
+}
+
+.torch-tailcap {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  width: 70px;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #8d99a7, #49515b);
+  box-shadow: inset 0 2px 4px rgba(255,255,255,0.16);
+}
+
+.torch-battery {
+  position: absolute;
+  left: 50%;
+  bottom: 40px;
+  transform: translateX(-50%);
+  width: 50px;
+  height: 22px;
+  border-radius: 8px;
+  border: 2px solid rgba(255,255,255,0.22);
+  background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(0,0,0,0.2));
+}
+
+body.light-theme .torch-head {
+  background: linear-gradient(180deg, #f7fbff 0%, #dfe7ef 24%, #a1b0c6 66%, #73808d 100%);
 }
 
 .torch-lens {
   position: absolute;
   left: 50%;
-  top: 18px;
+  top: 16px;
   transform: translateX(-50%);
-  width: 92px;
-  height: 92px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 40%, #fdfefe 0 18%, #cfd8e2 19% 30%, #8a97a6 31% 54%, #4a5664 55% 100%);
-  box-shadow: inset 0 6px 14px rgba(255,255,255,0.24), inset 0 -10px 18px rgba(0,0,0,0.28), 0 0 18px rgba(255,255,255,0.12);
+  background: radial-gradient(circle at 50% 40%, #fefefe 0 16%, #d9e1ea 17% 30%, #8d99aa 31% 58%, #4d5662 59% 100%);
+  box-shadow: inset 0 7px 16px rgba(255,255,255,0.28), inset 0 -12px 22px rgba(0,0,0,0.3), 0 0 22px rgba(255,255,255,0.14);
+}
+
+.app-shell.on .torch-lens {
+  box-shadow: inset 0 6px 14px rgba(255,255,255,0.24), inset 0 -10px 18px rgba(0,0,0,0.28), 0 0 28px rgba(255,255,255,0.25);
 }
 
 .torch-lens-core {
@@ -245,22 +347,26 @@ body {
   left: 50%;
   top: 102px;
   transform: translateX(-50%);
-  width: 112px;
-  height: 150px;
-  border-radius: 28px 28px 34px 34px;
-  background: linear-gradient(180deg, #5d6673 0%, #3b444f 58%, #252e38 100%);
-  box-shadow: inset 0 8px 14px rgba(255,255,255,0.08), inset 0 -10px 18px rgba(0,0,0,0.3), 0 18px 26px rgba(0,0,0,0.24);
+  width: 118px;
+  height: 154px;
+  border-radius: 30px 30px 38px 38px;
+  background: linear-gradient(180deg, #6b7480 0%, #414954 54%, #222831 100%);
+  box-shadow: inset 0 8px 14px rgba(255,255,255,0.08), inset 0 -12px 22px rgba(0,0,0,0.34), 0 18px 28px rgba(0,0,0,0.24);
+}
+
+body.light-theme .torch-grip {
+  background: linear-gradient(180deg, #8b99a9 0%, #5f6b78 58%, #35414b 100%);
 }
 
 .torch-switch {
   position: absolute;
   left: 50%;
-  top: 22px;
+  top: 20px;
   transform: translateX(-50%);
-  width: 52px;
+  width: 56px;
   height: 18px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.16);
   box-shadow: inset 0 2px 6px rgba(0,0,0,0.28);
   transition: all 0.25s ease;
 }
@@ -272,7 +378,7 @@ body {
 
 .torch-texture {
   position: absolute;
-  inset: 54px 18px 18px;
+  inset: 56px 18px 18px;
   border-radius: 22px;
   background:
     linear-gradient(90deg, rgba(255,255,255,0.06), transparent 35%, rgba(255,255,255,0.05) 65%, transparent),
@@ -284,6 +390,14 @@ body {
   animation: torchIdle 2.8s ease-in-out infinite;
 }
 
+.app-shell.pulse-mode .torch-body {
+  animation: torchPulse 1.2s ease-in-out infinite;
+}
+
+.app-shell.sos-mode .torch-body {
+  animation: torchSos 0.36s ease-in-out infinite;
+}
+
 .controls {
   display: grid;
   gap: 14px;
@@ -292,10 +406,16 @@ body {
 .control-card {
   padding: 16px;
   border-radius: 24px;
-  background: rgba(255,255,255,0.08);
+  background: var(--surface);
   backdrop-filter: blur(22px);
   border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 30px rgba(0,0,0,0.12);
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.3s ease;
+}
+
+.control-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(122,214,255,0.24);
 }
 
 .control-head {
@@ -309,6 +429,66 @@ body {
 input[type="range"] {
   width: 100%;
   accent-color: #7ad6ff;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7ad6ff, rgba(255,255,255,0.2));
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(122,214,255,0.18);
+}
+
+.mode-card {
+  display: grid;
+  gap: 10px;
+}
+
+.mode-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mode-pill {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  font-size: 0.86rem;
+  transition: all 0.2s ease;
+}
+
+.mode-pill.pressed {
+  transform: scale(0.96);
+}
+
+.mode-pill.active {
+  background: linear-gradient(180deg, #7ad6ff, #5aa7ff);
+  color: #03111e;
+  font-weight: 700;
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 12;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(4, 10, 18, 0.88);
+  color: #fff;
+  font-size: 0.9rem;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.24);
+  backdrop-filter: blur(16px);
 }
 
 .hidden, .modal-hidden { display: none !important; }
@@ -578,6 +758,21 @@ button:disabled {
 @keyframes torchIdle {
   0%, 100% { transform: translateX(-50%) translateY(0); }
   50% { transform: translateX(-50%) translateY(-2px); }
+}
+
+@keyframes torchPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes torchSos {
+  0%, 45%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+@keyframes beamSweepMove {
+  0% { transform: translateX(-140%) skewX(-20deg); }
+  100% { transform: translateX(140%) skewX(-20deg); }
 }
 
 @keyframes pop {
